@@ -1,0 +1,612 @@
+Good morning everyone!!
+
+I really have no business not being in bed right now, and especially not talking for 210 minutes over the day.
+
+So I'm going to type.
+
+I'm always hesitant to cancel classes since you or someone is paying for educational content, and I feel a responsibility to deliver it some way or another.  So... this will be a sort of quieter class. '^^
+
+Anyhow, one thing I wanted to make sure I noted: (example repo)
+
+Yes - a page that's resident is one that is currently found in physical memory.  The pages can be "paged out" or copied to disk to make space, at which point an access to that page will need to end up copying the data back into memory before it can succeed.  (More on that later.)
+
+That's the only plicker question today. (sorry :) )
+
+There are a couple of things from
+caching that I realize we missed with my
+day out last week, and I'd like to
+circle back and touch on those before we
+continue with address translation and
+page tables.  For one
+
+(ah, better)
+
+For one, there was an example that I had
+promised y'all. :)
+
+Hmm.. this is narrow...
+
+Still visible to everyone?
+
+So... here we have a simple array sum
+implementation.  We allocate an array
+that is DIM by DIM elements, right now
+that's 10000x10000, or 100 million
+longs.  I'm going to walk through the
+array first going across the rows,
+then down (the usual way we iterate a
+two-dimensional array).
+
+Pretty quick.
+
+(Bless you)
+
+If I simply exchange the two loops, so
+we add going down the columns first,
+from left to right... exact same
+number of statements, operations,
+instructions, everything.  The only
+difference is the order.
+
+OK, a little bit longer.  Let's kick
+it up a notch.
+
+"Normal" version first.
+
+Let's see, so that's 10 billion longs
+now, times 8 bytes is 80 GB.  OK, I
+see where this has gone wrong.
+
+OK, cool. 1.6 seconds, and of course
+we got the correct answer (?) (malloc
+= uninitialized?)  Now let's flip the
+loops...
+
+Aw man, I was hoping for something
+more dramatic.
+
+(needs popcorn meme)
+
+And now, using what we like to call
+"the right way"
+
+The "time" utility measures "real
+time" (i.e. how much time elapsed in
+the real world, also known as
+"wall-clock time"), as well as the
+time spent in userspace and
+kernel-space.  user = time spent doing
+your program's instructions, sys =
+time spent executing system calls on
+your program's behalf.  Roughly.  With
+some measurement error.  Maybe
+context-switching to other processes
+while it's going.
+
+(It's not a perfect benchmarking tool,
+but it's good for rough measurements.)
+
+So what's going on here???
+
+OK, why?
+
+So when the program accesses the first
+element of the first row of the array,
+our caches will cache the entire block
+around that address.  That block is
+much more likely to contain the next
+element of the array in the horizontal
+direction, than the next element in a
+vertical direction (which is an entire
+row's worth of elements away).  With
+smaller arrays, we saw less
+difference, because more of the array
+could fit entirely into caches.  As
+the array grows, eventually it won't
+fit in L1... then L2... then L3, and
+so the difference grows in magnitude.
+
+It's less about "finding" and more
+about what has *already* been loaded
+into cache.  But the intuition is
+right - the things nearby are likely
+to be loaded already because caches
+try to exploit spatial locality.
+
+The i, j loops exhibit good spatial
+locality, and the j, i version does
+not.  This is the sort of difference
+that that can make!
+
+OH!!!! the chart, I found it
+
+I had to go look in the slides for the
+OS textbook.
+
+Might have been something big
+allocated on the heap later in the
+program.  You can see diagonal stripes
+that are probably loop over arrays;
+I'd guess this was doing some sort of
+number crunching.
+
+You can also find it by going to
+os-book.com and looking in the slides
+for the Virtual Memory chapter. :)
+
+So that's one (I guess two) things I
+wanted to pick up.  One other one has
+to do with how we measure cache
+performance.
+
+Our example with good locality had
+good performance because a higher
+proportion of the memory accesses
+resulted in cache *hits*.  The other
+version had the same number of
+accesses, but more misses.  There are
+some statistics and parameters that we
+use to talk about this performance.
+
+Miss Rate - % of accesses that miss in
+a particular cache
+
+Hit Rate - % of accesses that hit
+(i.e. 1 - MR)
+
+The miss rate and hit rate of a cache
+are specific to the workload that we
+are running on it.  So it changed, for
+example, when we tried the second
+locality example.  It's not an
+inherent property of the cache itself,
+though it can of course be affected by
+good decisions about cache parameters
+like S, E, B, replacement strategy,
+write-back, etc.
+
+It can also be useful to quantify
+cache performance in actual time
+units.  For this, we need a few more
+parameters (and these are properties
+of the cache setup):
+
+Hit Time - how long does it take to
+service a request if there is a cache
+hit (different for each level of cache)
+
+Miss Penalty - how much *longer* does
+it take if there is a miss instead
+
+If we know these two properties of the
+cache, we can calculate the Effective
+Access Time (EAT... something I need
+to do after this class :-\ ) It's not
+a complicated calculation - just a
+weighted average of how long a miss
+versus a hit takes given (bless you)
+the miss rate of a workload.
+
+The simpler formula:
+
+EAT = HT + (MR * MP)
+
+For each access, we incur the hit
+time.  For the proportion of accesses
+that miss, we incur an additional miss
+penalty.
+
+You can also remember it as a weighted
+average:
+
+EAT = (HT * HR) + ((HT + MP) * MR)
+
+HT is time for a hit, HT + MP is time
+for a miss, and we average them
+together based on how often we hit or
+miss.
+
+EAT = (HT * (1 - MR)) + ((HT + MP) * MR)
+EAT = HT - HT * MR + ((HT + MP) * MR)
+EAT = HT - HT * MR + HT * MR + MP * MR
+
+EAT = HT + MP * MR
+
+So if you want to derive the simple
+one, you can do that too.  Whatever
+way helps you remember is great.
+(bless you)
+
+So... I think that covers everything I
+wanted to circle back to.  Any
+questions before we jump back into
+address translation?
+
+
+Matrix Transpose -
+
+If you go horizontally in the source,
+you go vertically in the destination.
+So you need to manage the cache misses
+across both of the arrays.  You can
+use local variables to store up a few
+values if you want and try and
+rearrange those accesses, but of
+course that can only be taken so far
+with the local variable limit.  That's
+why it's tricky - you have to work out
+an access pattern that will be at
+least tolerable in both of the arrays.
+
+There's also a really interesting
+example in the book's slides (and I
+think text?) about a matrix
+multiplication, and the order in which
+you iterate the *three* loops needed
+to calculate the result.  The result
+may surprise you!  (academic clickbait)
+
+Alright... so!  We were just learning
+about how disk can be used as a
+backing store for pages in memory (or
+as Bryant and O'Hallaron like to put
+it, RAM being used as a cache for
+"virtual memory").  The key to all of
+this is the page table and how memory
+accesses work with the MMU.
+
+This is what things looked like if
+there was a hit in the page table.
+But if there is a miss, the operating
+system needs to get involved.  Why?
+Well... if the page we need, and
+therefore the data we need, is on the
+disk somewhere, then there needs to be
+an I/O operation in order to read that
+information in.  As with any other I/O
+operation, it's the operating system's
+responsibility - our programs have to
+execute system calls when they do I/O
+since they're not even allowed to read
+and write files themselves.
+
+(That sounds restrictive, but it's a
+good thing, because without it we
+couldn't prevent one process from
+interfering directly with the
+execution of another one, either by
+messing with its memory mappings,
+writing to files that it has open, and
+so on.  So the OS is an important
+mediator for all of these operations.
+It can also do things like check user
+permissions at this point, now that
+control is out of the hands of the
+process.)
+
+So the OS needs to take control if
+there is a miss in the page table.
+The one mechanism we have for giving
+control back to OS code (in privileged
+mode)
+
+(privilege and kernel are the two most
+commonly misspelled words in this
+class :) )
+
+... is a hardware exception.  That's
+why system calls need to have a
+hardware exception (a trap) associated
+with them.  A miss in the page table
+will be a hardware exception known as
+a PAGE FAULT.  (Fault because it is
+something recoverable.)
+
+So if the process tries to access an
+address on a valid but non-resident
+page, the MMU will issue a page fault
+because either the valid bit is not
+set, or because it understands the
+"resident" distinction and the
+"resident" bit is not set.
+
+Handle SIGSEGV. (didn't mean to sound
+sassy) The buffer lab does
+it.
+
+So in one case or the other, the MMU
+will cause a hardware exception.  It's
+the only part of the system which has
+the opportunity, because it's the only
+thing between your process requesting
+a virtual address and the memory
+controller needing a physical address.
+
+When a page fault occurs, like any
+other hardware exception, control
+jumps to the handler that the OS has
+set up in the exception
+table/interrupt vector, and the
+processor changes into
+kernel/privileged mode.  So what does
+the page fault handler need to do?
+
+First: if the OS needs to be the one
+to distinguish between invalid and
+non-resident (i.e. not supported by
+the architecture), then it consults
+its extended version of the page
+table.  This extended page table is
+not read by the MMU (hardware), so
+it's the OS's choice as to what
+information it keeps there, what
+format, and so on.  If the page is not
+actually valid, then a segmentation
+fault occurs.  (On Linux/UNIX, that
+means sending SIGSEGV to the program.
+On Windows this is called a "General
+Protection Fault" or GPF... although I
+don't know if recent Windows tell you
+that anymore or just "Hey there was a
+problem but feel better" (taking
+lessons from Apple?))
+
+If, however, the page is valid, but
+just not resident, then the OS has
+control, so it can do the appropriate
+I/O operation to read the data from
+the disk.  Part of what it stores in
+the OS-level page table is any
+information needed to locate this data
+(like what offset on the disk, how
+long is the data, etc.).  The OS
+chooses a page of physical memory to
+evict - this is where it feels a lot
+like the same mechanisms used for
+caching - and if it has changed (yep,
+there's another dirty bit here),
+writes it back to wherever it came
+from, or writes it out to the disk for
+temporary storage.  Then the OS copies
+the data of the requested page in from
+disk, and it *updates the page table*
+at both OS and architecture level.
+Now the page is valid AND resident, so
+a memory access to a virtual address
+on that page should hit in the page
+table.
+
+Everything has been put into place.
+
+Page faults are left up to the OS to
+handle, so the only reason you would
+need to worry about them as a
+programmer is for performance reasons.
+As you might imagine from the long
+24-line paragraph above, handling a
+page fault is a slow process relative
+to how fast a memory access (or
+especially a cache access) would be.
+Remember disk is several orders of
+magnitude slower than RAM.  So if you
+can write your program to avoid page
+faults if possible, that benefits
+performance.
+
+Yeah, so let's think about when page
+faults would happen.  So far, the only
+real reason I've given is because
+you're out of actual physical memory
+storage.  Up to that point, there's no
+reason to kick any pages out to the
+backing store.  So one way to try and
+reduce page faults is to reduce the
+number of pages you are actively
+using.  (This set of pages is known as
+the WORKING SET, and how many of them
+there are is the WORKING SET SIZE.)
+When the working set size of all the
+processes on the system exceeds the
+number of physical pages, we will have
+*lots* of page faults - essentially
+"capacity misses" for the page table.
+
+There's another reason that page
+faults happen commonly, but I'll save
+that for a couple minutes from now.
+
+BUT the stage has been set... right,
+the OS copied the needed data in from
+disk, updated the page table so that
+it now maps the requested virtual page
+to the chosen physical page holding
+that data.  All we have to do is
+*restart the faulting instruction*.
+So a page fault is almost a little
+sleight of hand... you ask for
+something, I don't have it, so I run
+and get it and put it where it's
+supposed to be and say "ask again" and
+then it's there.
+
+So when the faulting instruction runs
+again, we will guaranteed have a hit
+in the page table.  And life goes on.
+
+The processor is expecting to get a
+response from the memory controller -
+some directly attached hardware - not
+from the OS in software.  So the most
+straightforward way to do it is just
+to have it ask again.  (It isn't
+particularly inefficient.)
+
+Yeah, because what if I'm reading the
+data into a register?  The OS isn't
+going to somehow write into the
+process's registers - it's just less
+intrusive and simpler to do it this
+way.
+
+So, I've been mentioning that there's
+another circumstance in which page
+faults commonly happen.  Now that we
+have this mechanism in place, all we
+*really* have to do to map something
+on disk to a page in memory is set up
+the page table.  If we leave it
+non-resident, then it will be paged in
+by the OS as soon as we ask for it.
+This "lazy" approach is called DEMAND
+PAGING.
+
+The other day I said that virtual
+memory makes loading programs into
+memory simpler, and I drew a diagram
+and sort of waved at it but didn't
+really explain *why* it was simpler.
+The code and data segments come
+directly from the contents of a file
+on the disk!  So to load those into
+memory, or effectively load them there
+even if we don't copy anything yet,
+all the OS needs to do is put the page
+table entries in place saying "this
+virtual page maps to this portion of
+this file, and it's not resident."  As
+soon as your program tries to access
+an address on one of these pages, it
+is at *that* point actually copied
+into memory by the page fault
+mechanism.
+
+This not only makes what execve() does
+simpler, it also saves us from wasting
+physical memory on pages of the
+program that we don't happen to end up
+using.
+
+So demand paging is another scenario
+in which page faults commonly happen.
+It's just the OS being lazy about what
+needs to be done, in hopes that some
+of that time doesn't need to be spent
+at all eventually.  It makes use of
+the existing page fault mechanism.
+
+Pretty slick.
+
+
+(excuse me)
+
+So big summary here.  Whenever a
+process tries to access a memory
+address (read or write):
+
+1. The process generates a virtual
+address, because that's what processes
+do.  This virtual address goes to the
+MMU.
+
+2. The MMU calculates the address of
+the needed page table entry and
+requests it from cache/memory.
+
+3. The memory controller gives that
+entry back to the MMU.
+
+4. The MMU checks to see if it needs
+to generate a hardware exception (i.e.
+not valid or not resident).
+
+4a. If there is a miss in the page
+table, generate a hardware exception,
+and the OS handler takes over.
+
+4b. The OS looks up the page in its
+extended page table to determine
+whether it is not valid or just not
+resident.
+
+4c. If not resident, page fault.
+Choose a victim page to evict if
+physical memory is full, and copy it
+out to disk.
+
+4d. Copy the requested page in from
+disk and update the page table entry.
+
+4e. Restart the faulting instruction,
+at which point there will be a hit,
+continue below.
+
+5. If there is a hit in the page
+table, then construct the physical
+address (address translation) and send
+it to the cache/memory.
+
+6. Data is returned to the processor.
+
+So all of this using these existing
+mechanisms provided by the hardware -
+exception table, address translation
+in the MMU.
+
+You can also do some other neat tricks
+with the page table.  For one, you may
+want to check other things about a
+memory access.  If my process wants to
+access memory, but the OS needs to
+validate something about that
+access... then we need to ensure that
+memory access will cause a hardware
+exception.  (Otherwise the OS doesn't
+get a say.)
+
+If you've got multiple cores it could
+work on them at the same time.  There
+might also be reasons to handle them
+in a specific order for mechanical
+hard disks (but that's a CSCI 455
+thing).
+
+So, for example, the OS might want to
+make sure that your process can read
+from a certain page but never writes
+to it.  Or... it may be relevant to
+make sure that certain portions of
+memory are readable and writable but
+not *executable* (cough cough buffer
+lab - one of the protections applied
+in part B).  In order for the OS to
+govern this, any offending access has
+to cause a page fault or similar
+exception.
+
+So you will also usually find defined
+in the architecture-level page table
+some more bits, such as RWX
+(read/write/execute) permission bits.
+
+PTE = page table entry - one of the
+records in a page table.
+
+This can be used to prevent certain
+kinds of accesses to certain pages.
+But who's to say you don't want to do
+something else?  The OS could, I don't
+know, print a test page to the
+printer every time you write to a
+certain address (silly example).  All
+it would need to do is make sure the
+page is NOT marked writable for the
+MMU, and then it can consult its
+extended information when it receives
+the hardware exception.
+
+Next time we'll see a, maybe more
+practical, use of this same idea.  And
+hopefully I will be a little more
+vocal. :)
+
+Have a good one!
