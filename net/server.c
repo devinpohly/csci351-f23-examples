@@ -8,8 +8,8 @@
 int main(void)
 {
 	// File descriptor
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0) {
+	int lfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (lfd < 0) {
 		perror("socket");
 		return 1;
 	}
@@ -19,44 +19,57 @@ int main(void)
 	addy.sin_port = htons(9999);
 	inet_aton("10.22.81.212", &addy.sin_addr);
 
-	int rv = bind(fd, (struct sockaddr *) &addy, sizeof(addy));
+	int rv = bind(lfd, (struct sockaddr *) &addy, sizeof(addy));
 	if (rv) {
 		perror("connect");
-		close(fd);
+		close(lfd);
 		return 1;
 	}
 
-	rv = listen(fd, 10);
+	rv = listen(lfd, 10);
 	if (rv) {
 		perror("listen");
-		close(fd);
+		close(lfd);
 		return 1;
 	}
 
-	char buf[256];
-	strcpy(buf, "hello world\n");
-	int len = strlen(buf);
-
-	rv = write(fd, buf, len);
-	if (rv < 0) {
-		perror("write");
-		close(fd);
-		return 1;
-	}
-	if (rv < len) {
-		fprintf(stderr, "short write!\n");
-	}
-
-	rv = read(fd, buf, sizeof(buf) - 1);
-	if (rv < 0) {
-		perror("read");
-		close(fd);
+	int cfd = accept(lfd, NULL, NULL);
+	if (cfd < 0) {
+		perror("accept");
+		close(lfd);
 		return 1;
 	}
 
-	buf[rv] = '\0';
-	printf("%s", buf);
+	for (;;) {
+		char buf[256];
 
-	close(fd);
+		int bytes = read(cfd, buf, sizeof(buf));
+		if (bytes < 0) {
+			perror("read");
+			close(cfd);
+			close(lfd);
+			return 1;
+		}
+		if (bytes == 0) {
+			// client closed connection
+			break;
+		}
+
+		buf[0] = 'j';
+
+		rv = write(cfd, buf, bytes);
+		if (rv < 0) {
+			perror("write");
+			close(cfd);
+			close(lfd);
+			return 1;
+		}
+		if (rv < bytes) {
+			fprintf(stderr, "short write!\n");
+		}
+	}
+
+	close(cfd);
+	close(lfd);
 	return 0;
 }

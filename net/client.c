@@ -47,6 +47,7 @@ int main(void)
 		return 1;
 	}
 
+	/* fwrite(buf, rv, 1, stdout); */
 	buf[rv] = '\0';
 	printf("%s", buf);
 
