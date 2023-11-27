@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/wait.h>
 
 int main(void)
 {
@@ -33,43 +34,55 @@ int main(void)
 		return 1;
 	}
 
-	int cfd = accept(lfd, NULL, NULL);
-	if (cfd < 0) {
-		perror("accept");
-		close(lfd);
-		return 1;
-	}
-
 	for (;;) {
-		char buf[256];
-
-		int bytes = read(cfd, buf, sizeof(buf));
-		if (bytes < 0) {
-			perror("read");
-			close(cfd);
+		int cfd = accept(lfd, NULL, NULL);
+		if (cfd < 0) {
+			perror("accept");
 			close(lfd);
 			return 1;
 		}
-		if (bytes == 0) {
-			// client closed connection
-			break;
-		}
 
-		buf[0] = 'j';
-
-		rv = write(cfd, buf, bytes);
-		if (rv < 0) {
-			perror("write");
-			close(cfd);
+		int child = fork();
+		if (child == 0) {
+			// this is the child
 			close(lfd);
-			return 1;
+
+			for (;;) {
+				char buf[256];
+
+				int bytes = read(cfd, buf, sizeof(buf));
+				if (bytes < 0) {
+					perror("read");
+					close(cfd);
+					close(lfd);
+					return 1;
+				}
+				if (bytes == 0) {
+					// client closed connection
+					break;
+				}
+
+				buf[0] = 'j';
+
+				rv = write(cfd, buf, bytes);
+				if (rv < 0) {
+					perror("write");
+					close(cfd);
+					close(lfd);
+					return 1;
+				}
+				if (rv < bytes) {
+					fprintf(stderr, "short write!\n");
+				}
+			}
+
+			close(cfd);
+			return 0;
 		}
-		if (rv < bytes) {
-			fprintf(stderr, "short write!\n");
-		}
+
+		close(cfd);
 	}
 
-	close(cfd);
 	close(lfd);
 	return 0;
 }
